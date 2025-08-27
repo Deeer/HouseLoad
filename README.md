@@ -24,13 +24,13 @@
 ## 🚀 快速开始
 
 ### 在线使用
-访问 [GitHub Pages](https://your-username.github.io/HouseProj/) 直接使用
+访问 [GitHub Pages](https://www.deeer.cn/HouseLoad/) 直接使用
 
 ### 本地运行
 1. 克隆项目
 ```bash
-git clone https://github.com/your-username/HouseProj.git
-cd HouseProj
+git clone https://github.com/Deeer/HouseLoad.git
+cd HouseLoad
 ```
 
 2. 打开 `index.html` 文件
@@ -160,7 +160,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 ## 📞 联系方式
 
 如有问题或建议，请通过以下方式联系：
-- 提交 [Issue](https://github.com/your-username/HouseProj/issues)
+- 提交 [Issue](https://github.com/Deeer/HouseLoad/issues)
 
 
 ---
