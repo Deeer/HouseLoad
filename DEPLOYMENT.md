@@ -25,11 +25,19 @@ git push -u origin main
 
 ### 3. 启用GitHub Pages
 
+#### 方式一：使用GitHub Actions（推荐）
 1. 在GitHub仓库页面，点击 "Settings" 标签
 2. 在左侧菜单中找到 "Pages"
 3. 在 "Source" 部分，选择 "Deploy from a branch"
 4. 在 "Branch" 下拉菜单中选择 "gh-pages"，点击 "Save"
 5. 等待几分钟，GitHub Actions会自动构建和部署
+
+#### 方式二：直接使用main分支
+1. 在GitHub仓库页面，点击 "Settings" 标签
+2. 在左侧菜单中找到 "Pages"
+3. 在 "Source" 部分，选择 "Deploy from a branch"
+4. 在 "Branch" 下拉菜单中选择 "main"，选择 "/ (root)" 文件夹
+5. 点击 "Save"
 
 ### 4. 访问你的网站
 
@@ -38,15 +46,18 @@ git push -u origin main
 https://your-username.github.io/HouseProj/
 ```
 
-## 手动部署（可选）
+## 手动部署（推荐）
 
-如果你不想使用GitHub Actions，也可以手动部署：
+最简单的方式是直接使用main分支部署：
 
-1. 在仓库设置中启用GitHub Pages
-2. 选择 "Deploy from a branch"
-3. 选择 "main" 分支
-4. 选择 "/ (root)" 文件夹
-5. 点击 "Save"
+1. 在GitHub仓库页面，点击 "Settings" 标签
+2. 在左侧菜单中找到 "Pages"
+3. 在 "Source" 部分，选择 "Deploy from a branch"
+4. 在 "Branch" 下拉菜单中选择 "main"
+5. 在 "Folder" 中选择 "/ (root)"
+6. 点击 "Save"
+
+这样设置后，你的网站会直接从main分支的根目录部署，无需额外的构建步骤。
 
 ## 自定义域名（可选）
 

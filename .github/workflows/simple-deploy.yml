@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Simple Deploy
 
 on:
   push:
@@ -17,4 +17,5 @@ jobs:
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: .
-        publish_branch: gh-pages
+        publish_branch: main
+        force_orphan: true
