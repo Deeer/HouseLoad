@@ -1,0 +1,2172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>房贷分阶段与提前还款可视化</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; background: #0b1220; color: #e6edf3; }
+    header { padding: 20px 24px; border-bottom: 1px solid #1e2636; position: sticky; top: 0; background: #0b1220; z-index: 10; }
+    header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+    .container { display: grid; grid-template-columns: 360px 1fr; gap: 20px; padding: 20px; }
+    
+    @media (max-width: 768px) {
+      .container { grid-template-columns: 1fr; }
+      .row { grid-template-columns: 1fr; gap: 6px; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: 1fr; }
+      .chart { height: 300px; }
+    }
+    .panel { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; }
+    .panel h2 { margin: 0; padding: 14px 16px; font-size: 14px; font-weight: 600; border-bottom: 1px solid #1e293b; color: #9fb4c8; }
+    .panel .content { padding: 14px 16px; }
+    .row { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: 10px; margin-bottom: 12px; }
+    label { color: #9fb4c8; font-size: 12px; }
+    input, select { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #2a3a4f; background: #0c1424; color: #e6edf3; }
+    input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .inline { display: flex; gap: 8px; }
+    .btn { appearance: none; border: 1px solid #334155; background: #0c1424; color: #e6edf3; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+    .btn:hover { background: #1e293b; border-color: #475569; }
+    .btn.primary { background: #2563eb; border-color: #2563eb; }
+    .btn.primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn.small { padding: 4px 8px; font-size: 11px; }
+    .small { font-size: 12px; color: #93a7bb; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stage-list { display: grid; gap: 8px; }
+    .stage-item { display: grid; grid-template-columns: 1fr 1fr 40px; gap: 8px; }
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .metric { background: #0c1424; border: 1px solid #223148; border-radius: 10px; padding: 12px; }
+    .metric .label { font-size: 12px; color: #93a7bb; }
+    .metric .value { font-size: 18px; font-weight: 600; margin-top: 6px; }
+    .metric .sub-label { font-size: 11px; color: #93a7bb; margin-top: 2px; }
+    .chart { height: 380px; }
+    .footer { padding: 10px 16px; border-top: 1px solid #1e293b; font-size: 12px; color: #93a7bb; }
+    .note { color: #9fb4c8; font-size: 12px; margin-top: 8px; }
+    .tabs { display: flex; border-bottom: 1px solid #1e293b; }
+    .tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+    .tab.active { border-bottom-color: #2563eb; color: #2563eb; }
+    .tab:hover { background: #1e293b; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 12px; }
+    .summary-item { background: #0c1424; border: 1px solid #223148; border-radius: 8px; padding: 12px; }
+    .summary-item .title { font-size: 12px; color: #93a7bb; margin-bottom: 4px; }
+    .summary-item .value { font-size: 16px; font-weight: 600; }
+    .loading { display: none; text-align: center; padding: 20px; color: #93a7bb; }
+    .loading.show { display: block; }
+    .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #334155; border-top: 2px solid #2563eb; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    
+    .suggestion-item { 
+      padding: 8px 12px; 
+      cursor: pointer; 
+      font-size: 12px; 
+      color: #93a7bb; 
+      transition: all 0.2s;
+      border-bottom: 1px solid #1e293b;
+    }
+    .suggestion-item:hover { 
+      background: #1e293b; 
+      color: #e6edf3; 
+    }
+    .suggestion-item:last-child { 
+      border-bottom: none; 
+    }
+    
+    .input-with-suggestions { position: relative; }
+    .input-suggestions { 
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    
+    .form-validation {
+      font-size: 11px;
+      margin-top: 4px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      display: none;
+    }
+    .form-validation.error {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    .form-validation.success {
+      background: rgba(16, 185, 129, 0.1);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>房贷分阶段利率与提前还款可视化</h1>
+  </header>
+  <div class="container">
+    <div class="panel">
+      <h2>参数设置</h2>
+      <div class="content">
+        <div class="row">
+          <label>贷款本金（元）</label>
+          <div style="position:relative;">
+            <input id="principal" type="number" value="2000000" min="0" step="1000" />
+            <div class="input-suggestions" style="position:absolute; top:100%; left:0; right:0; background:#0c1424; border:1px solid #1e293b; border-radius:8px; margin-top:4px; display:none; z-index:100;">
+              <div class="suggestion-item" data-value="1000000">100万</div>
+              <div class="suggestion-item" data-value="2000000">200万</div>
+              <div class="suggestion-item" data-value="3000000">300万</div>
+              <div class="suggestion-item" data-value="5000000">500万</div>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <label>总期数（月）</label>
+          <div style="position:relative;">
+            <input id="totalMonths" type="number" value="360" min="1" step="1" />
+            <div class="input-suggestions" style="position:absolute; top:100%; left:0; right:0; background:#0c1424; border:1px solid #1e293b; border-radius:8px; margin-top:4px; display:none; z-index:100;">
+              <div class="suggestion-item" data-value="120">10年 (120期)</div>
+              <div class="suggestion-item" data-value="180">15年 (180期)</div>
+              <div class="suggestion-item" data-value="240">20年 (240期)</div>
+              <div class="suggestion-item" data-value="300">25年 (300期)</div>
+              <div class="suggestion-item" data-value="360">30年 (360期)</div>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <label>还款方式</label>
+          <select id="repayType">
+            <option value="annuity">等额本息</option>
+            <option value="equal_principal">等额本金</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label>预设方案</label>
+          <select id="presetScenario">
+            <option value="">自定义</option>
+            <option value="lpr_down">LPR下调场景</option>
+            <option value="lpr_up">LPR上调场景</option>
+            <option value="early_payoff">提前还款策略</option>
+            <option value="staged_repay">分阶段还款</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label>初始年利率（%）</label>
+          <div style="position:relative;">
+            <input id="baseRate" type="number" value="3.8" step="0.01" min="0" max="20" />
+            <div class="input-suggestions" style="position:absolute; top:100%; left:0; right:0; background:#0c1424; border:1px solid #1e293b; border-radius:8px; margin-top:4px; display:none; z-index:100;">
+              <div class="suggestion-item" data-value="3.5">3.5% (优惠利率)</div>
+              <div class="suggestion-item" data-value="3.8">3.8% (基准利率)</div>
+              <div class="suggestion-item" data-value="4.0">4.0% (标准利率)</div>
+              <div class="suggestion-item" data-value="4.2">4.2% (上浮利率)</div>
+              <div class="suggestion-item" data-value="4.5">4.5% (高利率)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <label>分阶段利率</label>
+          <div>
+            <div id="stageList" class="stage-list"></div>
+            <div class="inline">
+              <input id="stageStart" type="number" placeholder="起始期数(月)" min="1" step="1" />
+              <input id="stageRate" type="number" placeholder="年利率(%)" step="0.01" min="0" max="20" />
+              <button id="addStage" class="btn">添加阶段</button>
+            </div>
+            <div class="stage-quick-add" style="margin-top:8px; display:flex; gap:4px; flex-wrap:wrap;">
+              <button class="btn small" data-start="13" data-rate="4.0">第13期 4.0%</button>
+              <button class="btn small" data-start="25" data-rate="4.2">第25期 4.2%</button>
+              <button class="btn small" data-start="37" data-rate="3.9">第37期 3.9%</button>
+              <button class="btn small" data-start="49" data-rate="3.7">第49期 3.7%</button>
+            </div>
+            <div class="note">示例：12 月起执行新年利率，可输入 起始期数=13。点击上方按钮快速添加常用阶段。</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <label>提前还款</label>
+          <div>
+            <div class="grid-2">
+              <input id="prepayMonth" type="number" placeholder="第几期提前还款" value="13" min="2" step="1" />
+              <input id="prepayAmount" type="number" placeholder="提前还款金额(元)" value="100000" min="0" step="1000" />
+            </div>
+            <div class="inline" style="margin-top:8px;">
+              <select id="prepayMode">
+                <option value="keep_payment_reduce_term">每月还款额不变，缩短期数</option>
+                <option value="keep_term_reduce_payment">期数不变，降低每月还款额</option>
+              </select>
+              <button id="addPrepay" class="btn">添加</button>
+            </div>
+            <div class="prepay-quick-add" style="margin-top:8px; display:flex; gap:4px; flex-wrap:wrap;">
+              <button class="btn small" data-month="12" data-amount="50000">第12期 5万</button>
+              <button class="btn small" data-month="24" data-amount="100000">第24期 10万</button>
+              <button class="btn small" data-month="36" data-amount="150000">第36期 15万</button>
+              <button class="btn small" data-month="48" data-amount="200000">第48期 20万</button>
+            </div>
+            <div id="prepayList" class="stage-list" style="margin-top:8px;"></div>
+            <div class="inline" style="margin-top:8px;">
+              <button id="calc" class="btn primary">计算与绘图</button>
+              <button id="clearPrepay" class="btn">清空</button>
+            </div>
+            <div class="note">
+              <div>提前还款默认在当期正常还款后立即发生（同月处理）。</div>
+              <div style="margin-top:4px;">
+                <strong>模式说明：</strong><br/>
+                • 缩短期数：保持月供不变，减少还款期数<br/>
+                • 降月供：保持期数不变，降低每月还款额
+              </div>
+              <div style="margin-top:4px;">
+                <strong>快速添加：</strong>点击上方按钮快速添加常用提前还款计划。
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <label>高级选项</label>
+          <div>
+            <div class="inline">
+              <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                <input type="checkbox" id="showDetails" checked />
+                显示详细计算过程
+              </label>
+              <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                <input type="checkbox" id="autoCalc" checked />
+                自动计算
+              </label>
+              <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                <input type="checkbox" id="showIRR" />
+                显示IRR分析
+              </label>
+              <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                <input type="checkbox" id="showInterestAnalysis" checked />
+                显示利息分析
+              </label>
+            </div>
+            <div class="note">自动计算：参数调整后自动更新结果 | IRR：内部收益率分析</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <label>分析模式</label>
+          <div>
+            <select id="analysisMode">
+              <option value="basic">基础分析</option>
+              <option value="advanced">高级分析</option>
+              <option value="comparison">多方案对比</option>
+            </select>
+            <div class="note">高级分析：包含IRR、敏感性分析等</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <label>操作</label>
+          <div>
+            <div class="inline">
+              <button id="resetForm" class="btn">重置参数</button>
+              <button id="copyConfig" class="btn">复制配置</button>
+              <button id="pasteConfig" class="btn">粘贴配置</button>
+            </div>
+            <div class="note">重置：恢复默认参数 | 复制/粘贴：快速保存和恢复配置</div>
+          </div>
+        </div>
+      </div>
+      <div class="footer small">说明：分阶段年利率与提前还款会触发后续期数的重算；结果为近似金融模型，实际以银行为准。</div>
+    </div>
+
+    <div class="panel">
+      <h2>图表与指标</h2>
+      <div class="content">
+        <div class="loading" id="loading">
+          <div class="spinner"></div>正在计算中...
+        </div>
+        
+        <div class="metrics">
+          <div class="metric">
+            <div class="label">不提前总利息</div>
+            <div class="value" id="baseTotalInterest">-</div>
+            <div class="sub-label" id="baseTotalInterestSub">-</div>
+          </div>
+          <div class="metric">
+            <div class="label">提前后总利息</div>
+            <div class="value" id="afterTotalInterest">-</div>
+            <div class="sub-label" id="afterTotalInterestSub">-</div>
+          </div>
+          <div class="metric">
+            <div class="label">预计节省利息</div>
+            <div class="value" id="savedInterest">-</div>
+            <div class="sub-label" id="savedInterestSub">-</div>
+          </div>
+        </div>
+        
+        <div class="summary-grid" id="summaryGrid" style="display:none;">
+          <div class="summary-item">
+            <div class="title">不提前还款期数</div>
+            <div class="value" id="baseMonths">-</div>
+          </div>
+          <div class="summary-item">
+            <div class="title">提前后还款期数</div>
+            <div class="value" id="afterMonths">-</div>
+          </div>
+          <div class="summary-item">
+            <div class="title">节省还款期数</div>
+            <div class="value" id="savedMonths">-</div>
+          </div>
+          <div class="summary-item">
+            <div class="title">提前还款总金额</div>
+            <div class="value" id="totalPrepayAmount">-</div>
+          </div>
+        </div>
+        
+        <!-- 利息变化详细分析 -->
+        <div class="interest-analysis" id="interestAnalysis" style="display:none; margin-top:16px;">
+          <div class="analysis-header" style="font-weight:600; color:#e6edf3; margin-bottom:12px; font-size:14px;">
+            利息变化详细分析
+          </div>
+          <div class="analysis-grid" style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+            <div class="analysis-item" style="background:#0c1424; border:1px solid #223148; border-radius:8px; padding:12px;">
+              <div class="analysis-title" style="font-size:12px; color:#93a7bb; margin-bottom:8px;">月供变化分析</div>
+              <div class="analysis-content" id="monthlyAnalysis">
+                <div style="font-size:11px; color:#93a7bb; line-height:1.4;">
+                  <div>• 平均月供变化: <span id="avgMonthlyChange">-</span></div>
+                  <div>• 最大月供变化: <span id="maxMonthlyChange">-</span></div>
+                  <div>• 月供变化期数: <span id="monthlyChangePeriods">-</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="analysis-item" style="background:#0c1424; border:1px solid #223148; border-radius:8px; padding:12px;">
+              <div class="analysis-title" style="font-size:12px; color:#93a7bb; margin-bottom:8px;">利息节省分析</div>
+              <div class="analysis-content" id="interestSavingsAnalysis">
+                <div style="font-size:11px; color:#93a7bb; line-height:1.4;">
+                  <div>• 节省比例: <span id="savingsPercentage">-</span></div>
+                  <div>• 平均每月节省: <span id="avgMonthlySavings">-</span></div>
+                  <div>• 节省效果评级: <span id="savingsRating">-</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 利息变化趋势分析 -->
+          <div class="trend-analysis" style="margin-top:12px; background:#0c1424; border:1px solid #223148; border-radius:8px; padding:12px;">
+            <div class="analysis-title" style="font-size:12px; color:#93a7bb; margin-bottom:8px;">利息变化趋势分析</div>
+            <div class="trend-content" id="trendAnalysis">
+              <div style="font-size:11px; color:#93a7bb; line-height:1.4;">
+                <div>• 利息节省趋势: <span id="interestTrend">-</span></div>
+                <div>• 提前还款时机: <span id="prepayTiming">-</span></div>
+                <div>• 投资回报建议: <span id="investmentAdvice">-</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div style="margin-top:12px; display:flex; gap:8px;">
+          <button id="exportBase" class="btn">导出不提前明细</button>
+          <button id="exportAfter" class="btn">导出提前后明细</button>
+          <button id="saveConfig" class="btn">保存配置</button>
+          <button id="loadConfig" class="btn">加载配置</button>
+        </div>
+        
+        <div class="tabs" style="margin-top:16px;">
+          <div class="tab active" data-tab="monthly">月供变化</div>
+          <div class="tab" data-tab="cumulative">累计利息</div>
+          <div class="tab" data-tab="balance">本金余额</div>
+        </div>
+        
+        <div class="tab-content active" id="monthlyTab">
+          <div id="chartMonthly" class="chart"></div>
+        </div>
+        <div class="tab-content" id="cumulativeTab">
+          <div id="chartCumulative" class="chart"></div>
+        </div>
+        <div class="tab-content" id="balanceTab">
+          <div id="chartBalance" class="chart"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 详细计算过程面板 -->
+    <div class="panel" id="detailsPanel" style="display:none;">
+      <h2>详细计算过程</h2>
+      <div class="content">
+        <div class="tabs">
+          <div class="tab active" data-tab="stages">利率阶段</div>
+          <div class="tab" data-tab="prepay">提前还款</div>
+          <div class="tab" data-tab="comparison">对比分析</div>
+        </div>
+        
+        <div class="tab-content active" id="stagesTab">
+          <div id="stagesDetails"></div>
+        </div>
+        <div class="tab-content" id="prepayTab">
+          <div id="prepayDetails"></div>
+        </div>
+        <div class="tab-content" id="comparisonTab">
+          <div id="comparisonDetails"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 高级分析面板 -->
+    <div class="panel" id="advancedPanel" style="display:none;">
+      <h2>高级分析</h2>
+      <div class="content">
+        <div class="tabs">
+          <div class="tab active" data-tab="irr">IRR分析</div>
+          <div class="tab" data-tab="sensitivity">敏感性分析</div>
+          <div class="tab" data-tab="scenarios">情景分析</div>
+        </div>
+        
+        <div class="tab-content active" id="irrTab">
+          <div id="irrAnalysis"></div>
+        </div>
+        <div class="tab-content" id="sensitivityTab">
+          <div id="sensitivityAnalysis"></div>
+        </div>
+        <div class="tab-content" id="scenariosTab">
+          <div id="scenariosAnalysis"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function formatCurrency(n) {
+      if (!isFinite(n)) return '-';
+      return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function parseStages(baseAnnualRate, totalMonths) {
+      const stages = [{ startMonth: 1, annualRate: baseAnnualRate }];
+      const list = document.querySelectorAll('.stage-item');
+      
+      for (const item of list) {
+        const start = Number(item.querySelector('[data-role="start"]').value);
+        const rate = Number(item.querySelector('[data-role="rate"]').value);
+        
+        // 验证输入
+        if (start >= 1 && start <= totalMonths && rate > 0 && rate <= 20) {
+          stages.push({ startMonth: start, annualRate: rate });
+        } else if (start > 0 && rate > 0) {
+          console.warn(`跳过无效阶段: 期数=${start}, 利率=${rate}%`);
+        }
+      }
+      
+      // 按起始期数排序
+      stages.sort((a, b) => a.startMonth - b.startMonth);
+      
+      // 合并相同起始期，保留最后一个
+      const merged = [];
+      for (const s of stages) {
+        if (merged.length && merged[merged.length - 1].startMonth === s.startMonth) {
+          merged[merged.length - 1] = s;
+        } else {
+          merged.push(s);
+        }
+      }
+      
+      // 验证阶段连续性
+      for (let i = 1; i < merged.length; i++) {
+        if (merged[i].startMonth <= merged[i-1].startMonth) {
+          console.warn(`阶段期数重叠，已自动调整: ${merged[i].startMonth} -> ${merged[i-1].startMonth + 1}`);
+          merged[i].startMonth = merged[i-1].startMonth + 1;
+        }
+      }
+      
+      return merged;
+    }
+
+    function annuityPayment(remainingPrincipal, monthlyRate, remainingMonths) {
+      if (remainingMonths <= 0) return 0;
+      if (monthlyRate === 0) return remainingPrincipal / remainingMonths;
+      const r = monthlyRate;
+      const n = remainingMonths;
+      return remainingPrincipal * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1);
+    }
+
+    function buildSchedule({ principal, totalMonths, stages, repayType }) {
+      let balance = principal;
+      let monthIdx = 1;
+      const schedule = [];
+      let stageIdx = 0;
+      let currentAnnual = stages[0].annualRate;
+      let currentMonthly = currentAnnual / 12 / 100;
+      let equalPrincipalMonthly = repayType === 'equal_principal' ? principal / totalMonths : 0;
+      let currentPayment = repayType === 'annuity' ? annuityPayment(balance, currentMonthly, totalMonths) : 0;
+
+      const nextStageMonth = () => stages[stageIdx + 1] ? stages[stageIdx + 1].startMonth : Infinity;
+
+      while (monthIdx <= totalMonths && balance > 0.01) {
+        // 检查是否到达新的利率阶段
+        if (monthIdx === nextStageMonth()) {
+          stageIdx += 1;
+          currentAnnual = stages[stageIdx].annualRate;
+          currentMonthly = currentAnnual / 12 / 100;
+          
+          // 在利率阶段起点重新计算还款计划
+          if (repayType === 'annuity') {
+            const remainingMonths = totalMonths - monthIdx + 1;
+            // 使用当前余额重新计算月供
+            currentPayment = annuityPayment(balance, currentMonthly, remainingMonths);
+          } else if (repayType === 'equal_principal') {
+            // 等额本金：重新计算每月本金还款额
+            equalPrincipalMonthly = balance / remainingMonths;
+          }
+        }
+
+        let interest = balance * currentMonthly;
+        let principalPay;
+        let payment;
+        
+        if (repayType === 'annuity') {
+          // 等额本息：确保月供不超过余额+利息
+          payment = Math.min(currentPayment, balance + interest);
+          principalPay = payment - interest;
+        } else {
+          // 等额本金：确保本金还款不超过余额
+          principalPay = Math.min(equalPrincipalMonthly, balance);
+          payment = principalPay + interest;
+        }
+        
+        balance = Math.max(0, balance - principalPay);
+        schedule.push({ 
+          month: monthIdx, 
+          payment, 
+          interest, 
+          principal: principalPay, 
+          balance,
+          stage: stageIdx + 1,
+          annualRate: currentAnnual
+        });
+        monthIdx += 1;
+      }
+
+      return schedule;
+    }
+
+    function applyPrepayment(baseSchedule, { principal, totalMonths, stages, repayType }, prepayEvents, prepayMode) {
+      if (!prepayEvents || prepayEvents.length === 0) {
+        return baseSchedule;
+      }
+
+      let currentSchedule = [...baseSchedule];
+      let currentPrincipal = principal;
+      let currentTotalMonths = totalMonths;
+      let currentStages = [...stages];
+
+      for (const event of prepayEvents) {
+        const { month, amount } = event;
+        if (!amount || amount <= 0 || !month || month < 2) continue;
+
+        // 获取提前还款前的还款记录
+        const until = currentSchedule.filter(m => m.month <= month);
+        const afterStart = currentSchedule.find(m => m.month === month);
+        let balanceAfterPayment = afterStart ? afterStart.balance : currentPrincipal;
+        
+        // 应用提前还款金额
+        balanceAfterPayment = Math.max(0, balanceAfterPayment - amount);
+
+        // 重新构造阶段（从 month+1 开始的阶段与利率）
+        const futureStages = [];
+        
+        // 找到当前利率阶段
+        const currentStage = [...currentStages].reverse().find(s => s.startMonth <= month) || currentStages[0];
+        
+        // 添加当前利率作为第一阶段（从提前还款后开始）
+        futureStages.push({ startMonth: 1, annualRate: currentStage.annualRate });
+        
+        // 添加后续的利率阶段
+        const remainingStages = currentStages
+          .filter(s => s.startMonth > month)
+          .map(s => ({ 
+            startMonth: s.startMonth - month, 
+            annualRate: s.annualRate 
+          }));
+        
+        futureStages.push(...remainingStages);
+
+        const monthsLeft = currentTotalMonths - month;
+
+        let rebuilt;
+        if (repayType === 'annuity') {
+          if (prepayMode === 'keep_payment_reduce_term') {
+            // 模式1：保持月供不变，缩短期数
+            const nextPayment = currentSchedule.find(m => m.month === month + 1)?.payment;
+            if (nextPayment) {
+              rebuilt = rebuildWithFixedPayment(balanceAfterPayment, monthsLeft, futureStages, nextPayment);
+            } else {
+              // 如果没有下一期数据，使用当前期月供
+              const currentPayment = currentSchedule.find(m => m.month === month)?.payment;
+              rebuilt = rebuildWithFixedPayment(balanceAfterPayment, monthsLeft, futureStages, currentPayment);
+            }
+          } else {
+            // 模式2：保持期数不变，降低月供
+            rebuilt = rebuildWithAnnuity(balanceAfterPayment, monthsLeft, futureStages);
+          }
+        } else {
+          // 等额本金：根据模式选择
+          if (prepayMode === 'keep_payment_reduce_term') {
+            // 等额本金模式下，保持月供不变意味着保持每月本金还款额不变
+            const currentPrincipalPayment = currentSchedule.find(m => m.month === month)?.principal;
+            rebuilt = rebuildWithEqualPrincipalFixedPayment(balanceAfterPayment, monthsLeft, futureStages, currentPrincipalPayment);
+          } else {
+            // 保持期数不变，重新计算每月本金还款额
+            rebuilt = rebuildWithEqualPrincipal(balanceAfterPayment, monthsLeft, futureStages);
+          }
+        }
+
+        // 更新状态用于下一次提前还款
+        currentSchedule = [...until, ...rebuilt];
+        currentPrincipal = balanceAfterPayment;
+        currentTotalMonths = rebuilt.length;
+        currentStages = futureStages;
+      }
+
+      return currentSchedule;
+    }
+
+    function rebuildWithAnnuity(balance, monthsLeft, stages) {
+      let schedule = [];
+      let month = 1;
+      let stageIdx = 0;
+      let currentAnnual = stages[0].annualRate;
+      let currentMonthly = currentAnnual / 12 / 100;
+      let currentPayment = annuityPayment(balance, currentMonthly, monthsLeft);
+      
+      const nextStageMonth = () => stages[stageIdx + 1] ? stages[stageIdx + 1].startMonth : Infinity;
+      
+      while (month <= monthsLeft && balance > 0.01) {
+        // 检查是否到达新的利率阶段
+        if (month === nextStageMonth()) {
+          stageIdx += 1;
+          currentAnnual = stages[stageIdx].annualRate;
+          currentMonthly = currentAnnual / 12 / 100;
+          const remain = monthsLeft - month + 1;
+          // 在利率阶段起点重新计算月供
+          currentPayment = annuityPayment(balance, currentMonthly, remain);
+        }
+        
+        const interest = balance * currentMonthly;
+        const payment = Math.min(currentPayment, balance + interest);
+        const principalPay = payment - interest;
+        balance = Math.max(0, balance - principalPay);
+        
+        schedule.push({ 
+          month: schedule.length + 1, 
+          payment, 
+          interest, 
+          principal: principalPay, 
+          balance,
+          stage: stageIdx + 1,
+          annualRate: currentAnnual
+        });
+        month += 1;
+      }
+      return schedule;
+    }
+
+    function rebuildWithFixedPayment(balance, monthsLeft, stages, fixedPayment) {
+      let schedule = [];
+      let month = 1;
+      let stageIdx = 0;
+      let currentAnnual = stages[0].annualRate;
+      let currentMonthly = currentAnnual / 12 / 100;
+      
+      const nextStageMonth = () => stages[stageIdx + 1] ? stages[stageIdx + 1].startMonth : Infinity;
+      
+      while (month <= monthsLeft && balance > 0.01) {
+        // 检查是否到达新的利率阶段
+        if (month === nextStageMonth()) {
+          stageIdx += 1;
+          currentAnnual = stages[stageIdx].annualRate;
+          currentMonthly = currentAnnual / 12 / 100;
+        }
+        
+        const interest = balance * currentMonthly;
+        const payment = Math.min(fixedPayment, balance + interest);
+        const principalPay = payment - interest;
+        
+        if (principalPay <= 0) {
+          // fixedPayment 太低导致无法覆盖利息，强制至少覆盖利息
+          const forcedPayment = balance + interest;
+          schedule.push({ 
+            month: schedule.length + 1, 
+            payment: forcedPayment, 
+            interest, 
+            principal: forcedPayment - interest, 
+            balance: 0,
+            stage: stageIdx + 1,
+            annualRate: currentAnnual
+          });
+          break;
+        }
+        
+        balance = Math.max(0, balance - principalPay);
+        schedule.push({ 
+          month: schedule.length + 1, 
+          payment, 
+          interest, 
+          principal: principalPay, 
+          balance,
+          stage: stageIdx + 1,
+          annualRate: currentAnnual
+        });
+        month += 1;
+      }
+      return schedule;
+    }
+
+    function rebuildWithEqualPrincipal(balance, monthsLeft, stages) {
+      let schedule = [];
+      let month = 1;
+      let stageIdx = 0;
+      let currentAnnual = stages[0].annualRate;
+      let currentMonthly = currentAnnual / 12 / 100;
+      let equalPrincipalMonthly = balance / monthsLeft;
+      
+      const nextStageMonth = () => stages[stageIdx + 1] ? stages[stageIdx + 1].startMonth : Infinity;
+      
+      while (month <= monthsLeft && balance > 0.01) {
+        // 检查是否到达新的利率阶段
+        if (month === nextStageMonth()) {
+          stageIdx += 1;
+          currentAnnual = stages[stageIdx].annualRate;
+          currentMonthly = currentAnnual / 12 / 100;
+          // 等额本金：重新计算每月本金还款额
+          const remainingMonths = monthsLeft - month + 1;
+          equalPrincipalMonthly = balance / remainingMonths;
+        }
+        
+        const interest = balance * currentMonthly;
+        const principalPay = Math.min(equalPrincipalMonthly, balance);
+        const payment = principalPay + interest;
+        balance = Math.max(0, balance - principalPay);
+        
+        schedule.push({ 
+          month: schedule.length + 1, 
+          payment, 
+          interest, 
+          principal: principalPay, 
+          balance,
+          stage: stageIdx + 1,
+          annualRate: currentAnnual
+        });
+        month += 1;
+      }
+      return schedule;
+    }
+
+    function rebuildWithEqualPrincipalFixedPayment(balance, monthsLeft, stages, fixedPrincipalPayment) {
+      let schedule = [];
+      let month = 1;
+      let stageIdx = 0;
+      let currentAnnual = stages[0].annualRate;
+      let currentMonthly = currentAnnual / 12 / 100;
+      
+      const nextStageMonth = () => stages[stageIdx + 1] ? stages[stageIdx + 1].startMonth : Infinity;
+      
+      while (month <= monthsLeft && balance > 0.01) {
+        // 检查是否到达新的利率阶段
+        if (month === nextStageMonth()) {
+          stageIdx += 1;
+          currentAnnual = stages[stageIdx].annualRate;
+          currentMonthly = currentAnnual / 12 / 100;
+        }
+        
+        const interest = balance * currentMonthly;
+        const principalPay = Math.min(fixedPrincipalPayment, balance);
+        const payment = principalPay + interest;
+        balance = Math.max(0, balance - principalPay);
+        
+        schedule.push({ 
+          month: schedule.length + 1, 
+          payment, 
+          interest, 
+          principal: principalPay, 
+          balance,
+          stage: stageIdx + 1,
+          annualRate: currentAnnual
+        });
+        month += 1;
+      }
+      return schedule;
+    }
+
+    function computeCumulativeInterest(schedule) {
+      const cumulative = [];
+      let sum = 0;
+      for (const m of schedule) {
+        sum += m.interest;
+        cumulative.push(sum);
+      }
+      return cumulative;
+    }
+
+    function exportToCSV(schedule, filename) {
+      const headers = ['期数', '月供(元)', '利息(元)', '本金(元)', '剩余本金(元)'];
+      const csvContent = [
+        headers.join(','),
+        ...schedule.map(m => [
+          m.month,
+          m.payment.toFixed(2),
+          m.interest.toFixed(2),
+          m.principal.toFixed(2),
+          m.balance.toFixed(2)
+        ].join(','))
+      ].join('\n');
+      
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+    }
+
+    function calculateIRR(cashFlows, guess = 0.1) {
+      // 使用牛顿法计算IRR
+      const tolerance = 1e-6;
+      const maxIterations = 100;
+      let rate = guess;
+      
+      for (let i = 0; i < maxIterations; i++) {
+        let npv = 0;
+        let derivative = 0;
+        
+        for (let j = 0; j < cashFlows.length; j++) {
+          const discountFactor = Math.pow(1 + rate, j);
+          npv += cashFlows[j] / discountFactor;
+          if (j > 0) {
+            derivative -= j * cashFlows[j] / Math.pow(1 + rate, j + 1);
+          }
+        }
+        
+        if (Math.abs(npv) < tolerance) {
+          return rate;
+        }
+        
+        const newRate = rate - npv / derivative;
+        if (Math.abs(newRate - rate) < tolerance) {
+          return newRate;
+        }
+        rate = newRate;
+      }
+      
+      return null; // 未收敛
+    }
+
+    function renderAdvancedAnalysis(baseSchedule, afterSchedule, stages, prepayEvents) {
+      const analysisMode = document.getElementById('analysisMode').value;
+      const showIRR = document.getElementById('showIRR').checked;
+      const advancedPanel = document.getElementById('advancedPanel');
+      
+      if (analysisMode === 'basic' && !showIRR) {
+        advancedPanel.style.display = 'none';
+        return;
+      }
+      
+      advancedPanel.style.display = 'block';
+      
+      // IRR分析
+      if (showIRR || analysisMode === 'advanced') {
+        const principal = Number(document.getElementById('principal').value);
+        const prepayEvents = getPrepayEvents();
+        
+        // 构建现金流：初始获得贷款，后续每月还款
+        const baseCashFlows = [-principal];
+        baseSchedule.forEach(month => {
+          baseCashFlows.push(-month.payment);
+        });
+        
+        const afterCashFlows = [-principal];
+        afterSchedule.forEach(month => {
+          afterCashFlows.push(-month.payment);
+        });
+        
+        // 添加提前还款现金流
+        prepayEvents.forEach(event => {
+          const monthIndex = event.month;
+          if (afterCashFlows[monthIndex]) {
+            afterCashFlows[monthIndex] -= event.amount;
+          }
+        });
+        
+        const baseIRR = calculateIRR(baseCashFlows);
+        const afterIRR = calculateIRR(afterCashFlows);
+        
+        const irrHtml = `
+          <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; margin-bottom:16px;">
+            <div style="background:#0c1424; border:1px solid #223148; border-radius:8px; padding:12px;">
+              <div style="font-weight:600; margin-bottom:8px; color:#ef4444;">不提前还款IRR</div>
+              <div style="font-size:16px; font-weight:600; color:#e6edf3;">
+                ${baseIRR ? (baseIRR * 100).toFixed(2) + '%' : '无法计算'}
+              </div>
+              <div style="font-size:12px; color:#93a7bb; margin-top:4px;">
+                年化内部收益率
+              </div>
+            </div>
+            <div style="background:#0c1424; border:1px solid #223148; border-radius:8px; padding:12px;">
+              <div style="font-weight:600; margin-bottom:8px; color:#10b981;">提前还款后IRR</div>
+              <div style="font-size:16px; font-weight:600; color:#e6edf3;">
+                ${afterIRR ? (afterIRR * 100).toFixed(2) + '%' : '无法计算'}
+              </div>
+              <div style="font-size:12px; color:#93a7bb; margin-top:4px;">
+                年化内部收益率
+              </div>
+            </div>
+          </div>
+          <div style="background:#0c1424; border:1px solid #223148; border-radius:8px; padding:12px;">
+            <div style="font-weight:600; margin-bottom:8px; color:#f59e0b;">IRR分析说明</div>
+            <div style="font-size:12px; color:#93a7bb; line-height:1.5;">
+              <div>• IRR（内部收益率）是衡量投资回报率的重要指标</div>
+              <div>• 负值表示现金流出，正值表示现金流入</div>
+              <div>• 提前还款通常能提高IRR，减少总体成本</div>
+              <div>• 数值越高，对借款人越有利</div>
+            </div>
+          </div>
+        `;
+        document.getElementById('irrAnalysis').innerHTML = irrHtml;
+      }
+      
+      // 敏感性分析
+      if (analysisMode === 'advanced') {
+        const principal = Number(document.getElementById('principal').value);
+        const baseRate = Number(document.getElementById('baseRate').value);
+        
+        const sensitivityData = [];
+        const rateChanges = [-1, -0.5, 0, 0.5, 1]; // 利率变化百分点
+        
+        rateChanges.forEach(change => {
+          const newRate = baseRate + change;
+          if (newRate > 0) {
+            const testStages = [{ startMonth: 1, annualRate: newRate }];
+            const testSchedule = buildSchedule({ 
+              principal, 
+              totalMonths: Number(document.getElementById('totalMonths').value), 
+              stages: testStages, 
+              repayType: document.getElementById('repayType').value 
+            });
+            const totalInterest = testSchedule.reduce((sum, m) => sum + m.interest, 0);
+            sensitivityData.push({
+              rate: newRate,
+              interest: totalInterest,
+              change: change
+            });
+          }
+        });
+        
+        const sensitivityHtml = `
+          <div style="margin-bottom:16px;">
+            <div style="font-weight:600; margin-bottom:8px; color:#e6edf3;">利率敏感性分析</div>
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
+              ${sensitivityData.map(item => `
+                <div style="background:#0c1424; border:1px solid #223148; border-radius:6px; padding:8px; text-align:center;">
+                  <div style="font-size:12px; color:#93a7bb;">利率 ${item.rate}%</div>
+                  <div style="font-size:14px; font-weight:600; color:#e6edf3;">
+                    ${formatCurrency(item.interest)}
+                  </div>
+                  <div style="font-size:10px; color:#93a7bb;">
+                    ${item.change > 0 ? '+' : ''}${item.change}%
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+        document.getElementById('sensitivityAnalysis').innerHTML = sensitivityHtml;
+      }
+      
+      // 情景分析
+      if (analysisMode === 'advanced') {
+        const scenarios = [
+          { name: '乐观情景', rateChange: -0.5, prepayAmount: 150000 },
+          { name: '基准情景', rateChange: 0, prepayAmount: 100000 },
+          { name: '悲观情景', rateChange: 0.5, prepayAmount: 50000 }
+        ];
+        
+        const principal = Number(document.getElementById('principal').value);
+        const baseRate = Number(document.getElementById('baseRate').value);
+        
+        const scenariosHtml = `
+          <div style="margin-bottom:16px;">
+            <div style="font-weight:600; margin-bottom:8px; color:#e6edf3;">情景分析</div>
+            <div style="display:grid; gap:8px;">
+              ${scenarios.map((scenario, idx) => {
+                const newRate = baseRate + scenario.rateChange;
+                const testStages = [{ startMonth: 1, annualRate: newRate }];
+                const testSchedule = buildSchedule({ 
+                  principal, 
+                  totalMonths: Number(document.getElementById('totalMonths').value), 
+                  stages: testStages, 
+                  repayType: document.getElementById('repayType').value 
+                });
+                const totalInterest = testSchedule.reduce((sum, m) => sum + m.interest, 0);
+                
+                return `
+                  <div style="background:#0c1424; border:1px solid #223148; border-radius:8px; padding:12px;">
+                    <div style="font-weight:600; margin-bottom:4px; color:${idx === 0 ? '#10b981' : idx === 1 ? '#3b82f6' : '#ef4444'}">
+                      ${scenario.name}
+                    </div>
+                    <div style="font-size:12px; color:#93a7bb; display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
+                      <div>利率: ${newRate}%</div>
+                      <div>提前还款: ${formatCurrency(scenario.prepayAmount)}</div>
+                      <div>总利息: ${formatCurrency(totalInterest)}</div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+        document.getElementById('scenariosAnalysis').innerHTML = scenariosHtml;
+      }
+    }
+
+    function renderDetails(baseSchedule, afterSchedule, stages, prepayEvents) {
+      const showDetails = document.getElementById('showDetails').checked;
+      const detailsPanel = document.getElementById('detailsPanel');
+      
+      if (!showDetails) {
+        detailsPanel.style.display = 'none';
+        return;
+      }
+      
+      detailsPanel.style.display = 'block';
+      
+      // 利率阶段详情
+      let stagesHtml = '<div style="margin-bottom:16px;">';
+      stages.forEach((stage, idx) => {
+        const endMonth = idx < stages.length - 1 ? stages[idx + 1].startMonth - 1 : '结束';
+        const stageMonths = idx < stages.length - 1 ? stages[idx + 1].startMonth - stage.startMonth : '剩余';
+        
+        // 计算该阶段的统计信息
+        const stageSchedule = baseSchedule.filter(m => m.stage === idx + 1);
+        const stageInterest = stageSchedule.reduce((sum, m) => sum + m.interest, 0);
+        const stagePayment = stageSchedule.reduce((sum, m) => sum + m.payment, 0);
+        
+        stagesHtml += `
+          <div style="background:#0c1424; border:1px solid #223148; border-radius:8px; padding:12px; margin-bottom:8px;">
+            <div style="font-weight:600; margin-bottom:8px; color:#e6edf3;">阶段 ${idx + 1}</div>
+            <div style="font-size:12px; color:#93a7bb; margin-bottom:8px;">
+              <div>期数范围: ${stage.startMonth} - ${endMonth} (${stageMonths}期)</div>
+              <div>年利率: ${stage.annualRate}% | 月利率: ${(stage.annualRate / 12).toFixed(4)}%</div>
+            </div>
+            <div style="font-size:11px; color:#64748b; display:grid; grid-template-columns: repeat(2, 1fr); gap:4px;">
+              <div>阶段利息: ${formatCurrency(stageInterest)}</div>
+              <div>阶段还款: ${formatCurrency(stagePayment)}</div>
+            </div>
+          </div>
+        `;
+      });
+      stagesHtml += '</div>';
+      document.getElementById('stagesDetails').innerHTML = stagesHtml;
+      
+      // 提前还款详情
+      let prepayHtml = '<div style="margin-bottom:16px;">';
+      if (prepayEvents.length === 0) {
+        prepayHtml += '<div style="color:#93a7bb; text-align:center; padding:20px;">暂无提前还款计划</div>';
+      } else {
+        prepayEvents.forEach((event, idx) => {
+          const baseMonth = baseSchedule.find(m => m.month === event.month);
+          const afterMonth = afterSchedule.find(m => m.month === event.month);
+          const balanceBefore = baseMonth ? baseMonth.balance : 0;
+          const balanceAfter = afterMonth ? afterMonth.balance : 0;
+          
+          // 计算提前还款效果
+          const originalRemainingMonths = baseSchedule.length - event.month;
+          const newRemainingMonths = afterSchedule.length - event.month;
+          const savedMonths = originalRemainingMonths - newRemainingMonths;
+          
+          // 计算月供变化
+          const originalNextPayment = baseSchedule.find(m => m.month === event.month + 1)?.payment;
+          const newNextPayment = afterSchedule.find(m => m.month === event.month + 1)?.payment;
+          const paymentChange = originalNextPayment && newNextPayment ? newNextPayment - originalNextPayment : 0;
+          
+          prepayHtml += `
+            <div style="background:#0c1424; border:1px solid #223148; border-radius:8px; padding:12px; margin-bottom:8px;">
+              <div style="font-weight:600; margin-bottom:8px; color:#e6edf3;">提前还款 ${idx + 1}</div>
+              <div style="font-size:12px; color:#93a7bb; margin-bottom:8px;">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">
+                  <div>期数: 第${event.month}期</div>
+                  <div>金额: ${formatCurrency(event.amount)}</div>
+                  <div>还款前余额: ${formatCurrency(balanceBefore)}</div>
+                  <div>还款后余额: ${formatCurrency(balanceAfter)}</div>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                  <div>节省期数: ${savedMonths}期</div>
+                  <div>月供变化: ${paymentChange > 0 ? '+' : ''}${formatCurrency(paymentChange)}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+      }
+      prepayHtml += '</div>';
+      document.getElementById('prepayDetails').innerHTML = prepayHtml;
+      
+      // 对比分析详情
+      const baseTotal = baseSchedule.reduce((sum, m) => sum + m.interest, 0);
+      const afterTotal = afterSchedule.reduce((sum, m) => sum + m.interest, 0);
+      const savedInterest = baseTotal - afterTotal;
+      const savedMonths = baseSchedule.length - afterSchedule.length;
+      const totalPrepayAmount = prepayEvents.reduce((sum, e) => sum + e.amount, 0);
+      
+      const comparisonHtml = `
+        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+          <div style="background:#0c1424; border:1px solid #223148; border-radius:8px; padding:12px;">
+            <div style="font-weight:600; margin-bottom:8px; color:#ef4444;">不提前还款</div>
+            <div style="font-size:12px; color:#93a7bb;">
+              <div>总期数: ${baseSchedule.length}期</div>
+              <div>总利息: ${formatCurrency(baseTotal)}</div>
+              <div>总还款: ${formatCurrency(baseSchedule.reduce((sum, m) => sum + m.payment, 0))}</div>
+            </div>
+          </div>
+          <div style="background:#0c1424; border:1px solid #223148; border-radius:8px; padding:12px;">
+            <div style="font-weight:600; margin-bottom:8px; color:#10b981;">提前还款后</div>
+            <div style="font-size:12px; color:#93a7bb;">
+              <div>总期数: ${afterSchedule.length}期</div>
+              <div>总利息: ${formatCurrency(afterTotal)}</div>
+              <div>总还款: ${formatCurrency(afterSchedule.reduce((sum, m) => sum + m.payment, 0) + totalPrepayAmount)}</div>
+            </div>
+          </div>
+          <div style="background:#0c1424; border:1px solid #223148; border-radius:8px; padding:12px; grid-column: span 2;">
+            <div style="font-weight:600; margin-bottom:8px; color:#f59e0b;">节省效果</div>
+            <div style="font-size:12px; color:#93a7bb; display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
+              <div>节省利息: ${formatCurrency(savedInterest)}</div>
+              <div>节省期数: ${savedMonths}期</div>
+              <div>提前还款: ${formatCurrency(totalPrepayAmount)}</div>
+            </div>
+          </div>
+        </div>
+      `;
+      document.getElementById('comparisonDetails').innerHTML = comparisonHtml;
+    }
+
+    function renderCharts(baseSchedule, afterSchedule, stages, prepayMonth) {
+      // 准备基础数据
+      const xBase = baseSchedule.map(m => m.month);
+      const xAfter = afterSchedule.map((_, i) => i + 1);
+      const monthlyBase = baseSchedule.map(m => m.payment);
+      const monthlyAfter = afterSchedule.map(m => m.payment);
+      const balanceBase = baseSchedule.map(m => m.balance);
+      const balanceAfter = afterSchedule.map(m => m.balance);
+
+      // 计算累计利息
+      const cumBase = computeCumulativeInterest(baseSchedule);
+      const cumAfter = computeCumulativeInterest(afterSchedule);
+
+      // 计算总利息和节省金额
+      const baseTotal = cumBase[cumBase.length - 1] || 0;
+      const afterTotal = cumAfter[cumAfter.length - 1] || 0;
+      const savedTotal = baseTotal - afterTotal;
+
+      // 更新指标面板
+      document.getElementById('baseTotalInterest').textContent = formatCurrency(baseTotal);
+      document.getElementById('afterTotalInterest').textContent = formatCurrency(afterTotal);
+      document.getElementById('savedInterest').textContent = formatCurrency(savedTotal);
+
+      // 更新摘要信息
+      const prepayEvents = getPrepayEvents();
+      const totalPrepayAmount = prepayEvents.reduce((sum, event) => sum + event.amount, 0);
+      
+      document.getElementById('baseMonths').textContent = baseSchedule.length;
+      document.getElementById('afterMonths').textContent = afterSchedule.length;
+      document.getElementById('savedMonths').textContent = baseSchedule.length - afterSchedule.length;
+      document.getElementById('totalPrepayAmount').textContent = formatCurrency(totalPrepayAmount);
+      document.getElementById('summaryGrid').style.display = 'grid';
+      
+      // 更新指标子标签
+      const principal = Number(document.getElementById('principal').value);
+      const baseTotalPayment = baseSchedule.reduce((sum, m) => sum + m.payment, 0);
+      const afterTotalPayment = afterSchedule.reduce((sum, m) => sum + m.payment, 0) + totalPrepayAmount;
+      
+      document.getElementById('baseTotalInterestSub').textContent = 
+        `总还款: ${formatCurrency(baseTotalPayment)} | 本金占比: ${((principal / baseTotalPayment) * 100).toFixed(1)}%`;
+      document.getElementById('afterTotalInterestSub').textContent = 
+        `总还款: ${formatCurrency(afterTotalPayment)} | 本金占比: ${((principal / afterTotalPayment) * 100).toFixed(1)}%`;
+      document.getElementById('savedInterestSub').textContent = 
+        `节省比例: ${((savedTotal / baseTotal) * 100).toFixed(1)}% | 相当于: ${(savedTotal / 12).toFixed(0)}个月工资`;
+      
+      // 计算详细的利息变化分析
+      updateInterestAnalysis(baseSchedule, afterSchedule, savedTotal, baseTotal);
+
+      // 准备关键事件标注点
+      const markers = [];
+      const prepayMarkers = [];
+      
+      // 添加利率阶段标注
+      stages.forEach((stage, idx) => {
+        if (idx > 0) { // 跳过第一个默认阶段
+          const stageStart = stage.startMonth - 1;
+          const stageEnd = idx < stages.length - 1 ? stages[idx + 1].startMonth - 1 : monthlyBase.length - 1;
+          
+          // 阶段开始标注
+          markers.push({
+            coord: [stageStart, monthlyBase[stageStart] || 0],
+            value: `利率调整: ${stage.annualRate}%`,
+            itemStyle: { color: '#f59e0b' },
+            symbol: 'diamond',
+            symbolSize: 10
+          });
+          
+          // 阶段结束标注（如果不是最后一个阶段）
+          if (idx < stages.length - 1) {
+            markers.push({
+              coord: [stageEnd, monthlyBase[stageEnd] || 0],
+              value: `阶段结束: ${stage.annualRate}%`,
+              itemStyle: { color: '#64748b' },
+              symbol: 'circle',
+              symbolSize: 6
+            });
+          }
+        }
+      });
+      
+      // 添加提前还款标注
+      prepayEvents.forEach((event, idx) => {
+        const prepayIdx = event.month - 1;
+        if (monthlyAfter[prepayIdx]) {
+          prepayMarkers.push({
+            coord: [prepayIdx, monthlyAfter[prepayIdx]],
+            value: `提前还款${prepayEvents.length > 1 ? idx + 1 : ''}: ${formatCurrency(event.amount)}`,
+            itemStyle: { color: '#ef4444' },
+            symbol: 'rect',
+            symbolSize: 8
+          });
+        }
+      });
+
+      // 月供变化图
+      const chart1 = echarts.init(document.getElementById('chartMonthly'));
+      chart1.setOption({
+        title: { 
+          text: '每月还款额变化', 
+          textStyle: { color: '#e6edf3', fontSize: 14, fontWeight: 'bold' },
+          subtext: `节省利息: ${formatCurrency(savedTotal)} | 缩短期数: ${baseSchedule.length - afterSchedule.length}期`,
+          subtextStyle: { color: '#93a7bb', fontSize: 12 }
+        },
+        tooltip: { 
+          trigger: 'axis',
+          backgroundColor: 'rgba(15, 23, 42, 0.9)',
+          borderColor: '#1e293b',
+          textStyle: { color: '#e6edf3' },
+          formatter: function(params) {
+            let result = `<div style="font-weight:bold; margin-bottom:8px;">第${params[0].axisValue}期</div>`;
+            params.forEach(param => {
+              if (param.seriesName.includes('月供')) {
+                const color = param.color;
+                result += `<div style="display:flex; align-items:center; margin:4px 0;">
+                  <span style="display:inline-block; width:12px; height:12px; background:${color}; margin-right:8px; border-radius:2px;"></span>
+                  <span>${param.seriesName}: ${formatCurrency(param.value)}</span>
+                </div>`;
+              }
+            });
+            return result;
+          }
+        },
+        legend: { 
+          data: ['不提前：月供', '提前后：月供'], 
+          textStyle: { color: '#cbd5e1' },
+          top: 30
+        },
+        grid: { left: 50, right: 30, top: 80, bottom: 50 },
+        xAxis: { 
+          type: 'category', 
+          name: '期数', 
+          nameTextStyle: { color: '#9fb4c8' },
+          data: xBase, 
+          axisLabel: { color: '#9fb4c8', fontSize: 11 },
+          axisLine: { lineStyle: { color: '#1e293b' } },
+          axisTick: { lineStyle: { color: '#1e293b' } }
+        },
+        yAxis: { 
+          type: 'value', 
+          name: '金额(元)', 
+          nameTextStyle: { color: '#9fb4c8' },
+          axisLabel: { color: '#9fb4c8', fontSize: 11 },
+          splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } },
+          axisLine: { lineStyle: { color: '#1e293b' } }
+        },
+        series: [
+          { 
+            name: '不提前：月供', 
+            type: 'line', 
+            smooth: true, 
+            data: monthlyBase, 
+            lineStyle: { width: 3, color: '#3b82f6' }, 
+            itemStyle: { color: '#3b82f6' },
+            areaStyle: { color: 'rgba(59, 130, 246, 0.1)' },
+            emphasis: { lineStyle: { width: 4 } }
+          },
+          { 
+            name: '提前后：月供', 
+            type: 'line', 
+            smooth: true, 
+            data: monthlyAfter, 
+            lineStyle: { width: 3, color: '#10b981' }, 
+            itemStyle: { color: '#10b981' },
+            areaStyle: { color: 'rgba(16, 185, 129, 0.1)' },
+            emphasis: { lineStyle: { width: 4 } }
+          },
+          { 
+            name: '利率调整', 
+            type: 'scatter', 
+            data: markers, 
+            symbolSize: 8,
+            itemStyle: { color: '#f59e0b' },
+            tooltip: { formatter: '{b}' }
+          },
+          { 
+            name: '提前还款', 
+            type: 'scatter', 
+            data: prepayMarkers, 
+            symbolSize: 10,
+            itemStyle: { color: '#ef4444' },
+            tooltip: { formatter: '{b}' }
+          }
+        ]
+      });
+
+      // 累计利息图
+      const chart2 = echarts.init(document.getElementById('chartCumulative'));
+      chart2.setOption({
+        title: { 
+          text: '累计利息对比', 
+          textStyle: { color: '#e6edf3', fontSize: 14, fontWeight: 'bold' },
+          subtext: `节省利息: ${formatCurrency(savedTotal)} | 节省比例: ${((savedTotal / baseTotal) * 100).toFixed(1)}%`,
+          subtextStyle: { color: '#93a7bb', fontSize: 12 }
+        },
+        tooltip: { 
+          trigger: 'axis',
+          backgroundColor: 'rgba(15, 23, 42, 0.9)',
+          borderColor: '#1e293b',
+          textStyle: { color: '#e6edf3' },
+          formatter: function(params) {
+            let result = `<div style="font-weight:bold; margin-bottom:8px;">第${params[0].axisValue}期</div>`;
+            params.forEach(param => {
+              const color = param.color;
+              result += `<div style="display:flex; align-items:center; margin:4px 0;">
+                <span style="display:inline-block; width:12px; height:12px; background:${color}; margin-right:8px; border-radius:2px;"></span>
+                <span>${param.seriesName}: ${formatCurrency(param.value)}</span>
+              </div>`;
+            });
+            
+            // 添加节省信息
+            if (params.length === 2) {
+              const saved = params[0].value - params[1].value;
+              result += `<div style="margin-top:8px; padding-top:8px; border-top:1px solid #1e293b; color:#10b981; font-weight:bold;">
+                节省: ${formatCurrency(saved)}
+              </div>`;
+            }
+            return result;
+          }
+        },
+        legend: { 
+          data: ['不提前：累计利息', '提前后：累计利息'], 
+          textStyle: { color: '#cbd5e1' },
+          top: 30
+        },
+        grid: { left: 50, right: 30, top: 80, bottom: 50 },
+        xAxis: { 
+          type: 'category', 
+          name: '期数', 
+          nameTextStyle: { color: '#9fb4c8' },
+          data: xAfter, 
+          axisLabel: { color: '#9fb4c8', fontSize: 11 },
+          axisLine: { lineStyle: { color: '#1e293b' } },
+          axisTick: { lineStyle: { color: '#1e293b' } }
+        },
+        yAxis: { 
+          type: 'value', 
+          name: '金额(元)', 
+          nameTextStyle: { color: '#9fb4c8' },
+          axisLabel: { color: '#9fb4c8', fontSize: 11 },
+          splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } },
+          axisLine: { lineStyle: { color: '#1e293b' } }
+        },
+        series: [
+          { 
+            name: '不提前：累计利息', 
+            type: 'line', 
+            smooth: true, 
+            data: cumBase, 
+            lineStyle: { width: 3, color: '#ef4444' }, 
+            itemStyle: { color: '#ef4444' },
+            areaStyle: { color: 'rgba(239, 68, 68, 0.1)' },
+            emphasis: { lineStyle: { width: 4 } }
+          },
+          { 
+            name: '提前后：累计利息', 
+            type: 'line', 
+            smooth: true, 
+            data: cumAfter, 
+            lineStyle: { width: 3, color: '#10b981' }, 
+            itemStyle: { color: '#10b981' },
+            areaStyle: { color: 'rgba(16, 185, 129, 0.1)' },
+            emphasis: { lineStyle: { width: 4 } }
+          }
+        ]
+      });
+
+      // 本金余额图
+      const chart3 = echarts.init(document.getElementById('chartBalance'));
+      chart3.setOption({
+        title: { 
+          text: '剩余本金变化', 
+          textStyle: { color: '#e6edf3', fontSize: 14, fontWeight: 'bold' },
+          subtext: `提前还款总金额: ${formatCurrency(totalPrepayAmount)}`,
+          subtextStyle: { color: '#93a7bb', fontSize: 12 }
+        },
+        tooltip: { 
+          trigger: 'axis',
+          backgroundColor: 'rgba(15, 23, 42, 0.9)',
+          borderColor: '#1e293b',
+          textStyle: { color: '#e6edf3' },
+          formatter: function(params) {
+            let result = `<div style="font-weight:bold; margin-bottom:8px;">第${params[0].axisValue}期</div>`;
+            params.forEach(param => {
+              const color = param.color;
+              result += `<div style="display:flex; align-items:center; margin:4px 0;">
+                <span style="display:inline-block; width:12px; height:12px; background:${color}; margin-right:8px; border-radius:2px;"></span>
+                <span>${param.seriesName}: ${formatCurrency(param.value)}</span>
+              </div>`;
+            });
+            return result;
+          }
+        },
+        legend: { 
+          data: ['不提前：剩余本金', '提前后：剩余本金'], 
+          textStyle: { color: '#cbd5e1' },
+          top: 30
+        },
+        grid: { left: 50, right: 30, top: 80, bottom: 50 },
+        xAxis: { 
+          type: 'category', 
+          name: '期数', 
+          nameTextStyle: { color: '#9fb4c8' },
+          data: xAfter, 
+          axisLabel: { color: '#9fb4c8', fontSize: 11 },
+          axisLine: { lineStyle: { color: '#1e293b' } },
+          axisTick: { lineStyle: { color: '#1e293b' } }
+        },
+        yAxis: { 
+          type: 'value', 
+          name: '金额(元)', 
+          nameTextStyle: { color: '#9fb4c8' },
+          axisLabel: { color: '#9fb4c8', fontSize: 11 },
+          splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } },
+          axisLine: { lineStyle: { color: '#1e293b' } }
+        },
+        series: [
+          { 
+            name: '不提前：剩余本金', 
+            type: 'line', 
+            smooth: true, 
+            data: balanceBase, 
+            lineStyle: { width: 3, color: '#8b5cf6' }, 
+            itemStyle: { color: '#8b5cf6' },
+            areaStyle: { color: 'rgba(139, 92, 246, 0.1)' },
+            emphasis: { lineStyle: { width: 4 } }
+          },
+          { 
+            name: '提前后：剩余本金', 
+            type: 'line', 
+            smooth: true, 
+            data: balanceAfter, 
+            lineStyle: { width: 3, color: '#f59e0b' }, 
+            itemStyle: { color: '#f59e0b' },
+            areaStyle: { color: 'rgba(245, 158, 11, 0.1)' },
+            emphasis: { lineStyle: { width: 4 } }
+          }
+        ]
+      });
+
+        // 渲染详细计算过程
+        renderDetails(baseSchedule, afterSchedule, stages, prepayEvents);
+        
+        // 图表自适应
+        setTimeout(() => {
+          const charts = ['chartMonthly', 'chartCumulative', 'chartBalance'];
+          charts.forEach(chartId => {
+            const chart = echarts.getInstanceByDom(document.getElementById(chartId));
+            if (chart) {
+              chart.resize();
+            }
+          });
+        }, 100);
+      }
+
+    let currentBaseSchedule = [];
+    let currentAfterSchedule = [];
+
+    function calculateAndDraw() {
+      // 显示加载状态
+      document.getElementById('loading').classList.add('show');
+      document.getElementById('summaryGrid').style.display = 'none';
+      
+      // 使用setTimeout确保UI更新
+      setTimeout(() => {
+        const principal = Number(document.getElementById('principal').value);
+        const totalMonths = Number(document.getElementById('totalMonths').value);
+        const repayType = document.getElementById('repayType').value;
+        const baseRate = Number(document.getElementById('baseRate').value);
+        const prepayMode = document.getElementById('prepayMode').value;
+
+        const stages = parseStages(baseRate, totalMonths);
+        const prepayEvents = getPrepayEvents();
+
+        currentBaseSchedule = buildSchedule({ principal, totalMonths, stages, repayType });
+        currentAfterSchedule = applyPrepayment(currentBaseSchedule, { principal, totalMonths, stages, repayType }, prepayEvents, prepayMode);
+
+        const firstPrepayMonth = prepayEvents.length > 0 ? prepayEvents[0].month : null;
+        renderCharts(currentBaseSchedule, currentAfterSchedule, stages, firstPrepayMonth);
+        
+        // 隐藏加载状态
+        document.getElementById('loading').classList.remove('show');
+      }, 100);
+    }
+
+    function switchTab(tabName) {
+      // 移除所有活动状态
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      
+      // 激活选中的标签页
+      document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+      document.getElementById(`${tabName}Tab`).classList.add('active');
+      
+      // 重新渲染图表以适应新容器大小
+      setTimeout(() => {
+        const charts = ['chartMonthly', 'chartCumulative', 'chartBalance'];
+        charts.forEach(chartId => {
+          const chart = echarts.getInstanceByDom(document.getElementById(chartId));
+          if (chart) {
+            chart.resize();
+          }
+        });
+      }, 100);
+    }
+
+    function addStageRow(start, rate) {
+      const list = document.getElementById('stageList');
+      const div = document.createElement('div');
+      div.className = 'stage-item';
+      div.innerHTML = `
+        <input data-role="start" type="number" placeholder="起始期数(月)" value="${start ?? ''}" min="1" step="1" />
+        <input data-role="rate" type="number" placeholder="年利率(%)" value="${rate ?? ''}" step="0.01" />
+        <button class="btn" title="删除">✕</button>
+      `;
+      div.querySelector('button').addEventListener('click', () => div.remove());
+      list.appendChild(div);
+    }
+
+    function addPrepayRow(month, amount, mode) {
+      const list = document.getElementById('prepayList');
+      const div = document.createElement('div');
+      div.className = 'stage-item';
+      const modeText = mode === 'keep_payment_reduce_term' ? '缩短期数' : '降月供';
+      div.innerHTML = `
+        <input data-role="month" type="number" placeholder="期数" value="${month ?? ''}" min="2" step="1" />
+        <input data-role="amount" type="number" placeholder="金额(元)" value="${amount ?? ''}" min="0" step="1000" />
+        <div style="display:flex; gap:4px;">
+          <span class="small" style="align-self:center;">${modeText}</span>
+          <button class="btn" title="删除">✕</button>
+        </div>
+        <div class="prepay-preview" style="font-size:11px; color:#64748b; margin-top:4px; display:none;">
+          预计节省: <span class="saved-interest">-</span> | 缩短: <span class="saved-months">-</span>期
+        </div>
+      `;
+      
+      // 删除按钮事件
+      div.querySelector('button').addEventListener('click', () => div.remove());
+      
+      // 实时预览功能
+      const preview = div.querySelector('.prepay-preview');
+      const updatePreview = () => {
+        if (currentBaseSchedule.length > 0) {
+          const previewMonth = Number(div.querySelector('[data-role="month"]').value);
+          const previewAmount = Number(div.querySelector('[data-role="amount"]').value);
+          
+          if (previewMonth >= 2 && previewAmount > 0) {
+            const baseMonth = currentBaseSchedule.find(m => m.month === previewMonth);
+            if (baseMonth) {
+              const balanceAfterPrepay = Math.max(0, baseMonth.balance - previewAmount);
+              const remainingMonths = currentBaseSchedule.length - previewMonth;
+              
+              // 简单估算节省效果
+              const monthlyInterest = baseMonth.interest;
+              const estimatedSavedInterest = monthlyInterest * remainingMonths * 0.3; // 粗略估算
+              const estimatedSavedMonths = Math.floor(previewAmount / baseMonth.payment);
+              
+              div.querySelector('.saved-interest').textContent = formatCurrency(estimatedSavedInterest);
+              div.querySelector('.saved-months').textContent = estimatedSavedMonths;
+              preview.style.display = 'block';
+            }
+          } else {
+            preview.style.display = 'none';
+          }
+        }
+      };
+      
+      // 监听输入变化
+      div.querySelector('[data-role="month"]').addEventListener('input', updatePreview);
+      div.querySelector('[data-role="amount"]').addEventListener('input', updatePreview);
+      
+      list.appendChild(div);
+      
+      // 初始预览
+      setTimeout(updatePreview, 100);
+    }
+
+    function getPrepayEvents() {
+      const events = [];
+      const list = document.querySelectorAll('#prepayList .stage-item');
+      for (const item of list) {
+        const month = Number(item.querySelector('[data-role="month"]').value);
+        const amount = Number(item.querySelector('[data-role="amount"]').value);
+        if (month >= 2 && amount > 0) {
+          events.push({ month, amount });
+        }
+      }
+      return events.sort((a, b) => a.month - b.month);
+    }
+
+    document.getElementById('addStage').addEventListener('click', () => addStageRow());
+    
+    // 快速添加阶段按钮
+    document.querySelectorAll('.stage-quick-add .btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const start = Number(btn.getAttribute('data-start'));
+        const rate = Number(btn.getAttribute('data-rate'));
+        addStageRow(start, rate);
+      });
+    });
+    
+    // 快速添加提前还款按钮
+    document.querySelectorAll('.prepay-quick-add .btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const month = Number(btn.getAttribute('data-month'));
+        const amount = Number(btn.getAttribute('data-amount'));
+        const mode = document.getElementById('prepayMode').value;
+        addPrepayRow(month, amount, mode);
+      });
+    });
+    document.getElementById('addPrepay').addEventListener('click', () => {
+      const month = Number(document.getElementById('prepayMonth').value);
+      const amount = Number(document.getElementById('prepayAmount').value);
+      const mode = document.getElementById('prepayMode').value;
+      
+      // 验证提前还款参数
+      if (month < 2) {
+        alert('提前还款期数必须大于等于第2期');
+        return;
+      }
+      if (amount <= 0) {
+        alert('提前还款金额必须大于0');
+        return;
+      }
+      if (amount > 20000000) {
+        alert('提前还款金额过大，请检查输入');
+        return;
+      }
+      
+      // 检查是否与现有提前还款冲突
+      const existingEvents = getPrepayEvents();
+      const conflict = existingEvents.find(event => event.month === month);
+      if (conflict) {
+        alert(`第${month}期已有提前还款计划，请选择其他期数`);
+        return;
+      }
+      
+      addPrepayRow(month, amount, mode);
+    });
+    document.getElementById('calc').addEventListener('click', () => calculateAndDraw());
+    document.getElementById('clearPrepay').addEventListener('click', () => {
+      document.getElementById('prepayList').innerHTML = '';
+    });
+    document.getElementById('exportBase').addEventListener('click', () => {
+      if (currentBaseSchedule.length > 0) {
+        exportToCSV(currentBaseSchedule, '房贷还款明细_不提前还款.csv');
+      }
+    });
+    document.getElementById('exportAfter').addEventListener('click', () => {
+      if (currentAfterSchedule.length > 0) {
+        exportToCSV(currentAfterSchedule, '房贷还款明细_提前还款后.csv');
+      }
+    });
+    document.getElementById('saveConfig').addEventListener('click', () => {
+      const config = {
+        principal: document.getElementById('principal').value,
+        totalMonths: document.getElementById('totalMonths').value,
+        repayType: document.getElementById('repayType').value,
+        baseRate: document.getElementById('baseRate').value,
+        prepayMode: document.getElementById('prepayMode').value,
+        stages: Array.from(document.querySelectorAll('#stageList .stage-item')).map(item => ({
+          start: item.querySelector('[data-role="start"]').value,
+          rate: item.querySelector('[data-role="rate"]').value
+        })),
+        prepayEvents: Array.from(document.querySelectorAll('#prepayList .stage-item')).map(item => ({
+          month: item.querySelector('[data-role="month"]').value,
+          amount: item.querySelector('[data-role="amount"]').value
+        }))
+      };
+      
+      const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = '房贷计算配置.json';
+      link.click();
+    });
+    document.getElementById('loadConfig').addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const config = JSON.parse(e.target.result);
+              document.getElementById('principal').value = config.principal;
+              document.getElementById('totalMonths').value = config.totalMonths;
+              document.getElementById('repayType').value = config.repayType;
+              document.getElementById('baseRate').value = config.baseRate;
+              document.getElementById('prepayMode').value = config.prepayMode;
+              
+              // 清空并重新添加阶段
+              document.getElementById('stageList').innerHTML = '';
+              config.stages.forEach(stage => {
+                addStageRow(stage.start, stage.rate);
+              });
+              
+              // 清空并重新添加提前还款
+              document.getElementById('prepayList').innerHTML = '';
+              config.prepayEvents.forEach(event => {
+                addPrepayRow(event.month, event.amount, config.prepayMode);
+              });
+              
+              calculateAndDraw();
+            } catch (error) {
+              alert('配置文件格式错误');
+            }
+          };
+          reader.readAsText(file);
+        }
+      };
+      input.click();
+    });
+
+    // 标签页切换
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const tabName = tab.getAttribute('data-tab');
+        switchTab(tabName);
+      });
+    });
+
+    // 自动计算功能
+    function setupAutoCalc() {
+      const autoCalc = document.getElementById('autoCalc').checked;
+      const inputs = document.querySelectorAll('input, select');
+      
+      inputs.forEach(input => {
+        input.removeEventListener('change', autoCalculate);
+        if (autoCalc) {
+          input.addEventListener('change', autoCalculate);
+        }
+      });
+    }
+
+    function autoCalculate() {
+      if (document.getElementById('autoCalc').checked) {
+        calculateAndDraw();
+      }
+    }
+
+    // 监听自动计算开关
+    document.getElementById('autoCalc').addEventListener('change', setupAutoCalc);
+    document.getElementById('showDetails').addEventListener('change', () => {
+      if (currentBaseSchedule.length > 0) {
+        const prepayEvents = getPrepayEvents();
+        renderDetails(currentBaseSchedule, currentAfterSchedule, parseStages(Number(document.getElementById('baseRate').value), Number(document.getElementById('totalMonths').value)), prepayEvents);
+      }
+    });
+    
+    document.getElementById('showInterestAnalysis').addEventListener('change', () => {
+      const showInterestAnalysis = document.getElementById('showInterestAnalysis').checked;
+      document.getElementById('interestAnalysis').style.display = showInterestAnalysis ? 'block' : 'none';
+    });
+
+    // 预设方案
+    document.getElementById('presetScenario').addEventListener('change', () => {
+      const scenario = document.getElementById('presetScenario').value;
+      if (!scenario) return;
+      
+      // 清空现有设置
+      document.getElementById('stageList').innerHTML = '';
+      document.getElementById('prepayList').innerHTML = '';
+      
+      switch (scenario) {
+        case 'lpr_down':
+          // LPR下调场景：第13期起利率从3.8%降至3.5%
+          document.getElementById('baseRate').value = 3.8;
+          addStageRow(13, 3.5);
+          break;
+        case 'lpr_up':
+          // LPR上调场景：第13期起利率从3.8%升至4.2%
+          document.getElementById('baseRate').value = 3.8;
+          addStageRow(13, 4.2);
+          break;
+        case 'early_payoff':
+          // 提前还款策略：第12期和第24期分别提前还款
+          document.getElementById('baseRate').value = 3.8;
+          addPrepayRow(12, 50000, 'keep_payment_reduce_term');
+          addPrepayRow(24, 100000, 'keep_payment_reduce_term');
+          break;
+        case 'staged_repay':
+          // 分阶段还款：多个利率调整点
+          document.getElementById('baseRate').value = 3.8;
+          addStageRow(13, 4.0);
+          addStageRow(25, 3.9);
+          addStageRow(37, 3.7);
+          break;
+      }
+      
+      // 重置为自定义
+      document.getElementById('presetScenario').value = '';
+      // 自动计算
+      calculateAndDraw();
+    });
+
+    // 默认添加一个示例阶段（第13期起 4.1%）
+    addStageRow(13, 4.1);
+    // 默认添加一个提前还款示例
+    addPrepayRow(13, 100000, 'keep_payment_reduce_term');
+    // 初始化自动计算
+    setupAutoCalc();
+    
+    // 输入建议功能
+    function setupInputSuggestions() {
+      const inputs = ['principal', 'totalMonths', 'baseRate'];
+      
+      inputs.forEach(inputId => {
+        const input = document.getElementById(inputId);
+        const suggestions = input.parentElement.querySelector('.input-suggestions');
+        
+        if (suggestions) {
+          // 点击输入框显示建议
+          input.addEventListener('focus', () => {
+            suggestions.style.display = 'block';
+          });
+          
+          // 点击建议项
+          suggestions.addEventListener('click', (e) => {
+            if (e.target.classList.contains('suggestion-item')) {
+              const value = e.target.getAttribute('data-value');
+              input.value = value;
+              input.dispatchEvent(new Event('input'));
+              suggestions.style.display = 'none';
+            }
+          });
+          
+          // 点击外部隐藏建议
+          document.addEventListener('click', (e) => {
+            if (!input.parentElement.contains(e.target)) {
+              suggestions.style.display = 'none';
+            }
+          });
+          
+          // 输入时隐藏建议
+          input.addEventListener('input', () => {
+            suggestions.style.display = 'none';
+          });
+        }
+      });
+    }
+    
+    // 表单验证功能
+    function setupFormValidation() {
+      const principal = document.getElementById('principal');
+      const totalMonths = document.getElementById('totalMonths');
+      const baseRate = document.getElementById('baseRate');
+      
+      function validatePrincipal() {
+        const value = Number(principal.value);
+        const validation = principal.parentElement.querySelector('.form-validation') || 
+                          createValidationElement(principal.parentElement);
+        
+        if (value <= 0) {
+          showValidation(validation, '请输入有效的贷款本金', 'error');
+        } else if (value > 10000000) {
+          showValidation(validation, '贷款本金过大，请检查输入', 'error');
+        } else {
+          showValidation(validation, '✓ 贷款本金有效', 'success');
+        }
+      }
+      
+      function validateTotalMonths() {
+        const value = Number(totalMonths.value);
+        const validation = totalMonths.parentElement.querySelector('.form-validation') || 
+                          createValidationElement(totalMonths.parentElement);
+        
+        if (value <= 0) {
+          showValidation(validation, '请输入有效的还款期数', 'error');
+        } else if (value > 600) {
+          showValidation(validation, '还款期数过大，建议不超过600期', 'error');
+        } else {
+          showValidation(validation, '✓ 还款期数有效', 'success');
+        }
+      }
+      
+      function validateBaseRate() {
+        const value = Number(baseRate.value);
+        const validation = baseRate.parentElement.querySelector('.form-validation') || 
+                          createValidationElement(baseRate.parentElement);
+        
+        if (value <= 0) {
+          showValidation(validation, '请输入有效的年利率', 'error');
+        } else if (value > 20) {
+          showValidation(validation, '年利率过高，请检查输入', 'error');
+        } else {
+          showValidation(validation, '✓ 年利率有效', 'success');
+        }
+      }
+      
+      principal.addEventListener('input', validatePrincipal);
+      totalMonths.addEventListener('input', validateTotalMonths);
+      baseRate.addEventListener('input', validateBaseRate);
+      
+      // 初始验证
+      validatePrincipal();
+      validateTotalMonths();
+      validateBaseRate();
+    }
+    
+    function createValidationElement(parent) {
+      const validation = document.createElement('div');
+      validation.className = 'form-validation';
+      parent.appendChild(validation);
+      return validation;
+    }
+    
+    function showValidation(element, message, type) {
+      element.textContent = message;
+      element.className = `form-validation ${type}`;
+      element.style.display = 'block';
+      
+      // 3秒后自动隐藏成功消息
+      if (type === 'success') {
+        setTimeout(() => {
+          element.style.display = 'none';
+        }, 3000);
+      }
+    }
+    
+    // 更新利息变化详细分析
+    function updateInterestAnalysis(baseSchedule, afterSchedule, savedTotal, baseTotal) {
+      // 计算月供变化分析
+      const monthlyChanges = [];
+      const minLength = Math.min(baseSchedule.length, afterSchedule.length);
+      
+      for (let i = 0; i < minLength; i++) {
+        const change = afterSchedule[i].payment - baseSchedule[i].payment;
+        monthlyChanges.push(change);
+      }
+      
+      const avgMonthlyChange = monthlyChanges.reduce((sum, change) => sum + change, 0) / monthlyChanges.length;
+      const maxMonthlyChange = Math.max(...monthlyChanges);
+      const monthlyChangePeriods = monthlyChanges.filter(change => Math.abs(change) > 0.01).length;
+      
+      // 计算利息节省分析
+      const savingsPercentage = ((savedTotal / baseTotal) * 100).toFixed(1);
+      const avgMonthlySavings = (savedTotal / baseSchedule.length).toFixed(0);
+      
+      // 节省效果评级
+      let savingsRating = '';
+      let ratingColor = '';
+      if (savingsPercentage >= 20) {
+        savingsRating = '优秀';
+        ratingColor = '#10b981';
+      } else if (savingsPercentage >= 10) {
+        savingsRating = '良好';
+        ratingColor = '#f59e0b';
+      } else if (savingsPercentage >= 5) {
+        savingsRating = '一般';
+        ratingColor = '#ef4444';
+      } else {
+        savingsRating = '较少';
+        ratingColor = '#64748b';
+      }
+      
+      // 更新分析面板
+      document.getElementById('avgMonthlyChange').textContent = formatCurrency(avgMonthlyChange);
+      document.getElementById('maxMonthlyChange').textContent = formatCurrency(maxMonthlyChange);
+      document.getElementById('monthlyChangePeriods').textContent = `${monthlyChangePeriods}期`;
+      document.getElementById('savingsPercentage').textContent = `${savingsPercentage}%`;
+      document.getElementById('avgMonthlySavings').textContent = formatCurrency(avgMonthlySavings);
+      document.getElementById('savingsRating').innerHTML = `<span style="color:${ratingColor}; font-weight:bold;">${savingsRating}</span>`;
+      
+      // 计算趋势分析
+      const prepayEvents = getPrepayEvents();
+      const firstPrepayMonth = prepayEvents.length > 0 ? prepayEvents[0].month : 0;
+      
+      // 利息节省趋势
+      let interestTrend = '';
+      if (savingsPercentage >= 15) {
+        interestTrend = '<span style="color:#10b981; font-weight:bold;">显著下降</span>';
+      } else if (savingsPercentage >= 8) {
+        interestTrend = '<span style="color:#f59e0b; font-weight:bold;">明显下降</span>';
+      } else {
+        interestTrend = '<span style="color:#64748b; font-weight:bold;">轻微下降</span>';
+      }
+      
+      // 提前还款时机
+      let prepayTiming = '';
+      if (firstPrepayMonth <= 12) {
+        prepayTiming = '<span style="color:#10b981; font-weight:bold;">早期还款，效果最佳</span>';
+      } else if (firstPrepayMonth <= 36) {
+        prepayTiming = '<span style="color:#f59e0b; font-weight:bold;">中期还款，效果良好</span>';
+      } else {
+        prepayTiming = '<span style="color:#ef4444; font-weight:bold;">晚期还款，效果有限</span>';
+      }
+      
+      // 投资回报建议
+      let investmentAdvice = '';
+      const monthlySavings = savedTotal / baseSchedule.length;
+      if (monthlySavings >= 1000) {
+        investmentAdvice = '<span style="color:#10b981; font-weight:bold;">强烈推荐提前还款</span>';
+      } else if (monthlySavings >= 500) {
+        investmentAdvice = '<span style="color:#f59e0b; font-weight:bold;">建议提前还款</span>';
+      } else {
+        investmentAdvice = '<span style="color:#64748b; font-weight:bold;">可考虑其他投资</span>';
+      }
+      
+      document.getElementById('interestTrend').innerHTML = interestTrend;
+      document.getElementById('prepayTiming').innerHTML = prepayTiming;
+      document.getElementById('investmentAdvice').innerHTML = investmentAdvice;
+      
+      // 显示分析面板（根据用户设置）
+      const showInterestAnalysis = document.getElementById('showInterestAnalysis').checked;
+      document.getElementById('interestAnalysis').style.display = showInterestAnalysis ? 'block' : 'none';
+    }
+    
+    // 窗口大小变化时自适应图表
+    window.addEventListener('resize', () => {
+      const charts = ['chartMonthly', 'chartCumulative', 'chartBalance'];
+      charts.forEach(chartId => {
+        const chart = echarts.getInstanceByDom(document.getElementById(chartId));
+        if (chart) {
+          chart.resize();
+        }
+      });
+    });
+    
+    // 初始化UI交互功能
+    setupInputSuggestions();
+    setupFormValidation();
+    
+    // 操作按钮功能
+    document.getElementById('resetForm').addEventListener('click', () => {
+      if (confirm('确定要重置所有参数到默认值吗？')) {
+        document.getElementById('principal').value = 2000000;
+        document.getElementById('totalMonths').value = 360;
+        document.getElementById('baseRate').value = 3.8;
+        document.getElementById('repayType').value = 'annuity';
+        document.getElementById('prepayMode').value = 'keep_payment_reduce_term';
+        document.getElementById('showDetails').checked = true;
+        document.getElementById('autoCalc').checked = true;
+        document.getElementById('showIRR').checked = false;
+        document.getElementById('analysisMode').value = 'basic';
+        
+        // 清空分阶段和提前还款
+        document.getElementById('stageList').innerHTML = '';
+        document.getElementById('prepayList').innerHTML = '';
+        
+        // 重新添加默认示例
+        addStageRow(13, 4.1);
+        addPrepayRow(13, 100000, 'keep_payment_reduce_term');
+        
+        calculateAndDraw();
+      }
+    });
+    
+    document.getElementById('copyConfig').addEventListener('click', () => {
+      const config = {
+        principal: document.getElementById('principal').value,
+        totalMonths: document.getElementById('totalMonths').value,
+        baseRate: document.getElementById('baseRate').value,
+        repayType: document.getElementById('repayType').value,
+        prepayMode: document.getElementById('prepayMode').value,
+        showDetails: document.getElementById('showDetails').checked,
+        autoCalc: document.getElementById('autoCalc').checked,
+        showIRR: document.getElementById('showIRR').checked,
+        analysisMode: document.getElementById('analysisMode').value,
+        stages: Array.from(document.querySelectorAll('#stageList .stage-item')).map(item => ({
+          start: item.querySelector('[data-role="start"]').value,
+          rate: item.querySelector('[data-role="rate"]').value
+        })),
+        prepayEvents: Array.from(document.querySelectorAll('#prepayList .stage-item')).map(item => ({
+          month: item.querySelector('[data-role="month"]').value,
+          amount: item.querySelector('[data-role="amount"]').value
+        }))
+      };
+      
+      navigator.clipboard.writeText(JSON.stringify(config, null, 2)).then(() => {
+        alert('配置已复制到剪贴板');
+      }).catch(() => {
+        alert('复制失败，请手动复制');
+      });
+    });
+    
+    document.getElementById('pasteConfig').addEventListener('click', () => {
+      navigator.clipboard.readText().then(text => {
+        try {
+          const config = JSON.parse(text);
+          
+          // 恢复基础参数
+          document.getElementById('principal').value = config.principal;
+          document.getElementById('totalMonths').value = config.totalMonths;
+          document.getElementById('baseRate').value = config.baseRate;
+          document.getElementById('repayType').value = config.repayType;
+          document.getElementById('prepayMode').value = config.prepayMode;
+          document.getElementById('showDetails').checked = config.showDetails;
+          document.getElementById('autoCalc').checked = config.autoCalc;
+          document.getElementById('showIRR').checked = config.showIRR;
+          document.getElementById('analysisMode').value = config.analysisMode;
+          
+          // 恢复分阶段
+          document.getElementById('stageList').innerHTML = '';
+          config.stages.forEach(stage => {
+            addStageRow(stage.start, stage.rate);
+          });
+          
+          // 恢复提前还款
+          document.getElementById('prepayList').innerHTML = '';
+          config.prepayEvents.forEach(event => {
+            addPrepayRow(event.month, event.amount, config.prepayMode);
+          });
+          
+          calculateAndDraw();
+          alert('配置已恢复');
+        } catch (error) {
+          alert('配置格式错误，请检查剪贴板内容');
+        }
+      }).catch(() => {
+        alert('读取剪贴板失败');
+      });
+    });
+    
+    // 首次渲染
+    calculateAndDraw();
+  </script>
+</body>
+</html>
+
+
